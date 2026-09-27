@@ -9,6 +9,13 @@ struct TZBoxApp: App {
     @StateObject private var model: AppModel
 
     init() {
+        // Override only this process for reproducible own-window visual QA.
+        if ProcessInfo.processInfo.environment["TZBOX_UI_SMOKE_OUTPUT"] != nil {
+            let appearance = ProcessInfo.processInfo.environment["TZBOX_UI_SMOKE_APPEARANCE"]
+            if appearance == "dark" { NSApplication.shared.appearance = NSAppearance(named: .darkAqua) }
+            if appearance == "light" { NSApplication.shared.appearance = NSAppearance(named: .aqua) }
+            if appearance == "contrast" { NSApplication.shared.appearance = NSAppearance(named: .accessibilityHighContrastAqua) }
+        }
         let model = AppModel()
         _model = StateObject(wrappedValue: model)
         TZBoxApplicationDelegate.model = model
@@ -19,7 +26,7 @@ struct TZBoxApp: App {
             MainView(model: model)
                 .background(SmokeWindowMarker(identifier: "TZBoxMainWindow"))
         }
-        .defaultSize(width: 980, height: 680)
+        .defaultSize(width: 1080, height: 740)
         .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(replacing: .newItem) {
@@ -49,6 +56,9 @@ final class TZBoxApplicationDelegate: NSObject, NSApplicationDelegate {
                 guard let window = NSApp.windows.first(where: { $0.identifier?.rawValue == identifier && $0.isVisible }),
                       let view = window.contentView else {
                     throw TZBoxError("自有窗口尚未显示，无法生成 UI 验收图片。")
+                }
+                if !captureChooser && ProcessInfo.processInfo.environment["TZBOX_UI_SMOKE_COMPACT"] == "1" {
+                    window.setContentSize(NSSize(width: 980, height: 680))
                 }
                 view.layoutSubtreeIfNeeded()
                 view.displayIfNeeded()

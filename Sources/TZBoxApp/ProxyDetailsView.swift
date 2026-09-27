@@ -17,11 +17,11 @@ struct ProxyDetailsView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(presentation.application?.name ?? "关于时区代理").font(.title2.weight(.semibold))
                     if presentation.application != nil {
-                        Text("应用详情与验证记录").font(.caption).foregroundStyle(.secondary)
+                        Text("应用详情与验证记录").font(.caption).foregroundStyle(TZStyle.secondary)
                     }
                 }
                 Spacer()
-                Button("完成") { dismiss() }.keyboardShortcut(.defaultAction)
+                Button("完成") { dismiss() }.buttonStyle(QuietButtonStyle()).keyboardShortcut(.defaultAction)
             }
             Divider()
             ScrollView {
@@ -37,8 +37,11 @@ struct ProxyDetailsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(24)
-        .frame(width: 640, height: 510)
+        .padding(28)
+        .frame(width: 660, height: 550)
+        .background(TZStyle.canvas)
+        .foregroundStyle(TZStyle.text)
+        .tint(TZStyle.accent)
     }
 
     private func applicationDetails(_ entry: AppEntry) -> some View {
@@ -53,7 +56,7 @@ struct ProxyDetailsView: View {
                 LabeledContent("版本", value: version)
             }
             VStack(alignment: .leading, spacing: 5) {
-                Text("应用位置").foregroundStyle(.secondary)
+                Text("应用位置").foregroundStyle(TZStyle.secondary)
                 Text(entry.applicationURL.path).font(.caption).textSelection(.enabled)
             }
             if let error = model.rowError(for: entry) {
@@ -77,27 +80,27 @@ struct ProxyDetailsView: View {
             Text("验证记录").font(.headline)
             if let report = presentation.report {
                 Text("历史检查，不代表当前运行状态。")
-                    .font(.callout).foregroundStyle(.secondary)
+                    .font(.callout).foregroundStyle(TZStyle.secondary)
                 Text("\(report.applicationVersion) · \(report.timeZoneID) · \(report.checkedAt.formatted(date: .abbreviated, time: .shortened))")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(TZStyle.secondary)
                 ForEach(report.checks) { check in
                     HStack(alignment: .top, spacing: 9) {
                         Image(systemName: outcomeIcon(check.outcome)).foregroundStyle(outcomeColor(check.outcome))
                         VStack(alignment: .leading, spacing: 4) {
                             Text(check.name).font(.subheadline.weight(.medium))
-                            Text(check.detail).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                            Text(check.detail).font(.caption).foregroundStyle(TZStyle.secondary).textSelection(.enabled)
                         }
                     }
                 }
                 if report.checks.isEmpty {
                     Text("这份记录没有检查项目。无法据此确认兼容性。")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(TZStyle.secondary)
                 }
             } else {
                 Label("尚无兼容性检查记录", systemImage: "questionmark.circle")
-                    .font(.callout).foregroundStyle(.secondary)
+                    .font(.callout).foregroundStyle(TZStyle.secondary)
                 Text("应用正常启动只说明目标时区已传入启动环境。请在应用内核对时间显示与相关功能。")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(TZStyle.secondary)
             }
         }
     }
@@ -113,11 +116,11 @@ struct ProxyDetailsView: View {
 
     private func explanationRow(_ icon: String, title: String, text: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon).font(.system(size: 17)).foregroundStyle(.secondary)
+            Image(systemName: icon).font(.system(size: 17)).foregroundStyle(TZStyle.secondary)
                 .frame(width: 22).padding(.top, 1)
             VStack(alignment: .leading, spacing: 5) {
                 Text(title).font(.subheadline.weight(.semibold))
-                Text(text).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(text).font(.callout).foregroundStyle(TZStyle.secondary).fixedSize(horizontal: false, vertical: true)
             }
         }
     }

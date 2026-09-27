@@ -29,10 +29,10 @@ struct TimeZoneChooser: View {
             HStack {
                 Text("选择目标时区").font(.headline)
                 Spacer()
-                Image(systemName: "globe").foregroundStyle(.secondary)
+                Image(systemName: "globe").foregroundStyle(TZStyle.secondary)
             }
             HStack(spacing: 7) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                Image(systemName: "magnifyingglass").foregroundStyle(TZStyle.secondary)
                 TextField("搜索城市或输入完整 IANA 标识", text: $query)
                     .textFieldStyle(.plain)
                     .focused($searchFocused)
@@ -42,64 +42,73 @@ struct TimeZoneChooser: View {
                     }
                 if !query.isEmpty {
                     Button { query = "" } label: {
-                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(TZStyle.secondary)
                     }
                     .buttonStyle(.plain).accessibilityLabel("清空搜索")
                 }
             }
             .padding(9)
-            .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 7))
-            .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(Color.primary.opacity(0.09), lineWidth: 0.5))
+            .softSurface(radius: 10, recessed: true)
 
             if !searchText.isEmpty && matches.isEmpty {
                 VStack(spacing: 9) {
-                    Image(systemName: "magnifyingglass").font(.title2).foregroundStyle(.tertiary)
+                    Image(systemName: "magnifyingglass").font(.title2).foregroundStyle(TZStyle.secondary)
                     Text("未找到匹配时区").font(.subheadline)
                     Text("试试 Tokyo、New York 或 US/Pacific。")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(TZStyle.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List {
-                    if searchText.isEmpty {
-                        Section("常用时区") {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 5) {
+                        if searchText.isEmpty {
+                            sectionTitle("常用时区")
                             ForEach(common, id: \.self) { option($0) }
-                        }
-                        Section("全部时区") {
+                            sectionTitle("全部时区").padding(.top, 10)
                             ForEach(TimeZones.identifiers.filter { !common.contains($0) }, id: \.self) { option($0) }
+                        } else {
+                            ForEach(matches, id: \.self) { option($0) }
                         }
-                    } else {
-                        ForEach(matches, id: \.self) { option($0) }
                     }
+                    .padding(.vertical, 5)
                 }
-                .listStyle(.inset)
-                .scrollContentBackground(.hidden)
             }
             Divider()
             Text("选定后，运行中的应用需分别重新应用。")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(TZStyle.secondary)
         }
-        .padding(18)
-        .frame(width: 440, height: 470)
+        .padding(22)
+        .frame(width: 440, height: 500)
+        .background(TZStyle.canvas)
+        .foregroundStyle(TZStyle.text)
+        .tint(TZStyle.accent)
         .background(SmokeWindowMarker(identifier: "TZBoxTimeZoneChooser"))
         .onAppear { searchFocused = true }
+    }
+
+    private func sectionTitle(_ title: String) -> some View {
+        Text(title).font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(TZStyle.secondary).padding(.horizontal, 10).padding(.vertical, 7)
     }
 
     private func option(_ identifier: String) -> some View {
         Button { choose(identifier) } label: {
             HStack(spacing: 9) {
                 Image(systemName: identifier == selected ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(identifier == selected ? Color.accentColor : Color.secondary.opacity(0.3))
+                    .foregroundStyle(identifier == selected ? TZStyle.accent : TZStyle.secondary.opacity(0.65))
                     .font(.system(size: 13))
                 Text(identifier).font(.system(size: 12, weight: identifier == selected ? .semibold : .regular))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                 Spacer(minLength: 4)
                 Text(TimeZones.offsetLabel(for: identifier))
-                    .font(.system(size: 11).monospacedDigit()).foregroundStyle(.secondary)
+                    .font(.system(size: 11).monospacedDigit()).foregroundStyle(TZStyle.secondary)
             }
-            .padding(.vertical, 5)
-            .contentShape(Rectangle())
+            .padding(.horizontal, 10).padding(.vertical, 8)
+            .background {
+                if identifier == selected { Color.clear.softSurface(radius: 9, recessed: true) }
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 9))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(identifier)，\(TimeZones.offsetLabel(for: identifier))\(identifier == selected ? "，当前目标" : "")")

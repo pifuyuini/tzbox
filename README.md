@@ -1,62 +1,86 @@
+<p align="center">
+  <img src="Assets/AppIcon/AppIcon.png" width="112" height="112" alt="TZBox 图标">
+</p>
+
 # TZBox
 
-macOS 应用级时区代理。所有应用统一通过 NSWorkspace 启动，并在启动环境中设置 `TZ`；系统时区和真实时刻保持不变。
+**同一个真实时刻，按你选择的时区运行应用。**
 
-## 当前范围
+TZBox 是 macOS 原生应用级时区代理：选择时区、添加应用，再正常启动或重启。系统时区保持不变，应用继续使用自己的资料、账号和设置。
 
-- 原生 SwiftUI 主窗口与菜单栏，支持 macOS 14+、Apple Silicon。
-- 添加任意有效的 `.app`，使用原应用的资料、账号和设置正常重启。
-- 单一目标时区；运行期间可以修改目标，但需要逐行确认重启才能重新应用。各行显示本次实际启动时区。
-- 既有实例或从 Dock 等外部入口启动的实例显示为未受管，不推断其时区。
-- 不改系统时区、不改真实时钟、不注入第三方代码、不改写网络请求。
-- 没有通用的运行中热劫持能力。启动环境已设置不等于所有时间 API 都兼容。
+## 能做什么
 
-实机结论仅适用于 [验证记录](docs/VALIDATION.md) 列明的版本和功能。
+- 为 Chrome、Cherry Studio 和其他 macOS `.app` 统一设置启动时区。
+- 搜索 IANA 时区，实时对照目标时间与系统时间，按当地规则处理夏令时。
+- 查看每个应用的实际启动时区、运行状态和“待重新应用”提示。
+- 正常重启以应用新时区，或恢复系统时区；应用拒绝退出时保留原实例。
+- 关闭窗口后留在菜单栏。退出 TZBox 不会关闭已启动的应用，重新打开可恢复存活会话的识别。
+
+所有应用采用相同的 `NSWorkspace + TZ` 启动机制。产品不创建专用 Chrome 资料，不使用 CDP 覆写页面、不注入第三方代码，也不改写网络请求。
+
+## 界面
+
+暖色画布、陶土色强调与柔和层次，让目标时区、系统时间和应用状态保持清楚。图标源图与生成记录见 [图标资产](Assets/AppIcon/GENERATION.md)，界面与交互约定见 [设计说明](docs/DESIGN.md)。
+
+![TZBox 浅色主窗口](docs/images/tzbox-light.png)
+
+<details>
+<summary>深色模式与时区选择器</summary>
+
+![TZBox 深色主窗口](docs/images/tzbox-dark.png)
+
+![时区选择器](docs/images/timezone-chooser.png)
+
+</details>
 
 ## 构建
 
-使用已安装的 Swift 5.9+ 和 macOS SDK，无第三方运行时依赖：
+需要 **macOS 14 或以上、Apple Silicon、Swift 5.9 或以上，以及已安装的 macOS SDK / Command Line Tools**。构建没有第三方运行时依赖，不需要 Rust 或 Python。
 
 ```sh
-./scripts/build.sh
+git clone https://github.com/pifuyuini/tzbox.git
+cd tzbox
+./scripts/build.sh release
+open build/TZBox.app
 ```
 
-输出为 `build/TZBox.app`。构建脚本执行本地 ad-hoc 签名及包检查；未进行 Developer ID 公证，不是面向公众分发的安装包。
+应用输出为 `build/TZBox.app`。构建使用 Swift Package Manager；仅装 Command Line Tools 且 SwiftPM 的 PlatformPath 查询不可用时，自动使用现有 `swiftc` 编译相同源码。脚本不会安装工具或修改系统开发配置。
 
-标准环境使用 Swift Package Manager。仅装 Command Line Tools 且 SwiftPM 报 PlatformPath 错误时，脚本用现有 swiftc 编译相同源码，不修改系统工具配置。已有 Rust、Python 环境配置不参与应用构建；测试辅助使用仓库 `.venv/bin/python`，不安装 Python 依赖。
+图标从仓库的透明 PNG 通过系统 `sips` 和 `iconutil` 生成全部标准尺寸，并与源 PNG 一起打包。应用使用本地 ad-hoc 签名；Developer ID 签名、公证和自动更新尚未提供。版本与打包步骤见 [发布说明](docs/RELEASE.md)。
 
 ## 使用
 
-1. 打开 `build/TZBox.app`，搜索并选择目标时区，例如 `Asia/Tokyo`。
+1. 打开 TZBox，选择目标时区，例如 `Asia/Tokyo`。
 2. 点击“添加应用”，选择应用的 `.app`。
-3. 应用未运行时，点击“应用并启动”；已运行时，点击“重启并应用”，保存内容并确认正常重启。应用自己的保存提示需要手动处理，TZBox 不强制结束进程。
-4. 修改目标时区不会更改已有进程。受管应用仍显示原启动时区及“待重新应用”，分别重启后才采用新目标。
-5. 从应用菜单选择“恢复系统时区并重启”，会先正常退出，再以不设置 `TZ` 的环境启动；恢复后的实例不标记为受管。
-6. 关闭窗口后，TZBox 留在菜单栏。退出 TZBox 不关闭应用；再次打开时，根据保存的 PID、应用路径和启动时间识别仍存活的受管会话。应用自行重启后视为未受管。
+3. 未运行的应用可直接应用并启动；已运行的应用需要保存内容并确认正常重启。应用自己的保存提示需手动处理，TZBox 不强制结束进程。
+4. 修改目标时区后，已有进程继续显示原启动时区。为各应用重新应用后，新目标才生效。
+5. 在应用菜单选择恢复系统时区，会正常退出该实例，再以不设置 `TZ` 的环境启动。
 
-应用操作尚未完成时不能退出 TZBox。受管应用仍运行但记录保存失败时，应重试保存或正常退出该应用后再退出 TZBox。损坏的设置或运行记录可以显式备份并恢复；不能确认的进程保持未受管，不会因恢复记录被重启。
+从 Dock 或其他外部入口启动、自行重启的应用显示为未受管。运行记录不能证明其启动环境时，TZBox 不推断时区。
 
-设置、运行记录和历史验证报告位于 `~/Library/Application Support/TZBox`。`TZBOX_DATA_DIR` 可指定测试数据目录。程序不扫描系统应用目录，由用户选择应用。
+设置、运行记录和历史报告位于 `~/Library/Application Support/TZBox`。应用操作尚未完成时不能退出 TZBox；记录保存失败时可重试。损坏记录通过明确的恢复操作保留备份，不会静默覆盖原件。
 
-## 从旧版迁移
+## 效果与边界
 
-旧 Chrome 专用入口、产品 CDP 后端和独立 Chrome 资料管理已删除。旧设置中的 Chrome 条目迁移到统一启动方式；应用继续使用原应用的默认资料。旧版保留在 TZBox 数据目录中的 Chrome profile 不会删除、自动导入或继续管理。需要其中资料时，请自行保留原件。
+**需要正常重启，不支持无重启接管任意运行中应用。**“已应用到启动环境”表示本次启动传入了目标时区，不能证明应用全部功能均采用它。网页、Worker、扩展、原生界面、服务器和远程工具需分别验证。
 
-## 如何理解效果
+当前实机证据来自 macOS 14.4、Chrome 154.0.8037.57 与 Cherry Studio 2.0.8。最终联合验收通过 157 项检查，包括时区切换、恢复系统环境、真实时间戳，以及隔离测试资料跨重启保留。完整范围、未验证项目和证据说明见 [验证记录](docs/VALIDATION.md)。
 
-“已应用到启动环境”表示 TZBox 本次启动传入了目标时区，不表示应用全部功能已验证。页面、Worker、扩展、原生界面、账号设置、服务器和远程工具应分别检查。
+Cherry Studio 普通聊天的实际请求中，`{{datetime}}` 随目标时区变化；`{{timezone}}` 仍为未解析文本，请求没有独立 timezone 字段。TZBox 不补造字段，模型回答也不能代替实际请求证据。账号设置、服务器提供的时间和远程执行环境可能独立于本机时区。
 
-若关心发给模型的时间，应核对实际请求，不能只看模型回答。Cherry Studio 2.0.8 的实测普通聊天请求中，`{{datetime}}` 随目标时区正确变化；`{{timezone}}` 仍为未解析文本，请求没有独立 timezone 字段。TZBox 不会补造字段。
-
-## 自有测试
+## 验证与开发
 
 ```sh
 ./scripts/test.sh
 ./scripts/test.sh --native-probe
 ```
 
-XCTest 可用时使用 SwiftPM；Command Line Tools 环境执行相同测试方法的自有断言运行器，不标作 Apple XCTest。
+自有测试还需要 `.venv/bin/python`；Python 辅助程序使用标准库，脚本不会安装依赖。首次克隆后，可用已安装的 Python 3.12 执行 `python3.12 -m venv .venv` 创建测试环境；已有环境无需重建。SwiftPM/XCTest 可用时执行标准测试；Command Line Tools 环境执行同一批测试方法的自有断言运行器，不标作 Apple XCTest。
 
-第二条还会创建仓库内自有的 `TZBoxProbe.app`，通过真实 NSWorkspace 检查父子进程时区、真实时间戳、正常重启、恢复系统环境和会话恢复，不启动已安装的第三方应用。
+`--native-probe` 创建自有测试应用，经真实 NSWorkspace 验证父子进程时区、真实时间戳、正常重启、恢复系统环境和会话恢复，不启动第三方应用。测试临时目录位于仓库 `tmp/`，构建产物位于 `build/`。
 
-临时目录在仓库 `tmp/` 下创建并标记；清理仅限本次目录，未知内容会保留。构建产物存放在 `build/`。真实应用测试范围与复验步骤见 [集成验证说明](docs/INTEGRATION.md)。
+真实应用测试使用明确授权的隔离资料，避免触及个人实例；步骤与诊断入口见 [集成验证说明](docs/INTEGRATION.md)。`TZBOX_DATA_DIR` 可为开发指定独立的 TZBox 数据目录。
+
+## 旧版迁移
+
+旧设置中的 Chrome 条目自动迁移为统一启动方式，继续使用原应用的默认资料。旧版 TZBox 的独立 Chrome profile 不会被删除、导入或继续管理，需要其中资料时请保留原件。

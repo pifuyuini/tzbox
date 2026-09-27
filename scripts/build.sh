@@ -3,10 +3,13 @@ set -eu
 repository=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$repository"
 configuration=${1:-release}
+icon_file=$("$repository/scripts/build-icon.sh")
 binary_directory=$("$repository/scripts/compile.sh" "$configuration")
 bundle="$repository/build/TZBox.app"
 mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
 cp "$binary_directory/TZBoxApp" "$bundle/Contents/MacOS/TZBox"
+cp "$repository/Assets/AppIcon/AppIcon.png" "$bundle/Contents/Resources/AppIcon.png"
+cp "$icon_file" "$bundle/Contents/Resources/AppIcon.icns"
 if [ -f "$binary_directory/libTZBoxCore.dylib" ]; then
   mkdir -p "$bundle/Contents/Frameworks"
   cp "$binary_directory/libTZBoxCore.dylib" "$bundle/Contents/Frameworks/"
@@ -21,8 +24,9 @@ cat > "$bundle/Contents/Info.plist" <<'PLIST'
 <key>CFBundleName</key><string>TZBox</string>
 <key>CFBundleDisplayName</key><string>TZBox</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.2.0</string>
-<key>CFBundleVersion</key><string>2</string>
+<key>CFBundleShortVersionString</key><string>0.3.0</string>
+<key>CFBundleVersion</key><string>3</string>
+<key>CFBundleIconFile</key><string>AppIcon.icns</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSPrincipalClass</key><string>NSApplication</string>
@@ -32,4 +36,4 @@ PLIST
 /usr/bin/plutil -lint "$bundle/Contents/Info.plist"
 /usr/bin/codesign --force --sign - "$bundle"
 /usr/bin/codesign --verify --strict "$bundle"
-echo "$bundle"
+printf '%s\n' "$bundle"
