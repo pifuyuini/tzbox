@@ -1,38 +1,63 @@
 # 验证记录
 
-验证日期：2026-09-27（Asia/Shanghai）。所有构建和执行均在远端仓库完成，未读取或启动已安装的 Chrome、Cherry Studio。
+验证日期：2026-09-27（Asia/Shanghai）。本轮在远端仓库验证统一 NSWorkspace + TZ 代理，并使用授权的隔离测试资料检查真实 Chrome 154 与 Cherry Studio 2.0.8。兼容性仅限下述版本与范围。
 
-## 环境与构建
+## 环境
 
-- macOS 14.4，arm64；Apple Swift 5.9；仓库 Python 3.12.11。
-- 此机仅配置 Command Line Tools。SwiftPM 的 `xcrun --show-sdk-platform-path` 查询失败，未安装 Xcode、依赖或修改开发工具设置。
-- 通过现有 `swiftc` 编译相同源码，debug 与 release 均成功。保留 Package.swift 供具备完整 SwiftPM 环境的机器使用；本机未执行 Apple XCTest runner。
-- 发布应用：`build/TZBox.app`。Info.plist 检查及本地 ad-hoc 签名验证通过；不包含 App Sandbox entitlement，未进行 Developer ID 公证。
+- macOS 14.4、arm64；Apple Swift 5.9；仓库 Python 3.12.11。
+- 仅配置 Command Line Tools；SwiftPM 的 PlatformPath 查询不可用，使用现有 swiftc 路径，不标作 Apple XCTest。
+- 发布入口为 `build/TZBox.app`。构建使用本地 ad-hoc 签名，未进行 Developer ID 公证。
+- 产品已删除 ChromeController/CDP 后端与独立 Chrome 资料管理。旧 profile 保留，所有应用统一使用原资料正常重启。
 
-## 已执行的验证
+## 已确认结果
 
 | 项目 | 结果 | 范围 |
 |---|---|---|
-| Swift 自有测试运行器 | 34/34 通过 | 执行原测试方法的真实断言，覆盖配置、时区、验证报告、会话持久化、CDP 协议、时区探针及控制进程状态 |
-| Python HTTP fixture | 4/4 通过 | 请求捕获、鉴权头不入日志、流式响应、页面/Worker资源、非法请求 |
-| NSWorkspace 自有 App 探针 | 8/8 检查通过 | 父子进程 TZ、POSIX/Foundation 默认时区、真实时间戳、宿主时区 |
-| 发布包窗口冒烟 | 通过 | 独立临时配置启动，渲染自身窗口后正常退出，无第三方应用启动 |
-| 窗口视觉检查 | 通过 | 默认窗口布局、中文文字、时区/时钟、Chrome入口、普通应用空状态与兼容说明无截断 |
-| Python 与 shell 检查 | 通过 | 任务脚本、HTTP fixture 的 Ruff 检查及 shell 语法检查 |
-| 独立静态审核 | 已修复并复核 | 页面覆写失败仍执行、检查成功覆盖并发失败、普通应用启动/保存期间退出丢会话 |
+| Swift 自有断言测试 | 41/41 通过 | 统一启动、正常退出拒绝/超时、重启失败、原有实例与受管状态、会话身份恢复、记录损坏恢复、保存失败及排除测试外 PID |
+| Python HTTP fixture | 4/4 通过 | 请求捕获、鉴权头不入日志、流式响应与测试资源 |
+| 诊断越界探针请求 | 2/2 拒绝通过 | 自有探针路径与进程归属边界 |
+| 真实自有 App 生命周期 | 15/15 通过 | NY→Kolkata→系统；父子进程 TZ 与时间转换、真实时间戳、正常重启、恢复会话、恢复系统环境与正常退出 |
+| Chrome 与 Cherry 最终统一引擎验收 | 157/157 通过、3 个 Cherry 实际请求 | 固定最终诊断副本；两应用均经生产 NativeLauncher 执行 NY→Kolkata→系统 Shanghai→退出 |
+| Chrome 154.0.8037.57 | 最终联合验收通过 | 7 个网页环境、真实时刻、7 个历史日期、Cookie/localStorage 跨重启保留 |
+| Cherry Studio 2.0.8 / Electron 41.8.0 | 最终联合验收通过 | 主进程、renderer、实际请求三阶段正确；模型和合成助手配置保留 |
+| 默认窗口目视检查 | 通过 | 标题、时区与系统时钟、应用空状态、操作按钮及底部说明无裁切 |
+| 已添加应用窗口目视检查 | 通过 | 纽约目标与上海系统时钟、Chrome 运行中未受管、Cherry 停止/尚未应用，两行按钮清楚且无裁切；证据：`tmp/20260927T020602Z-ui-populated/window.png` |
+| 时区选择器目视检查 | 通过 | 补充不透明自有截图后，标题、搜索框、IANA 时区名称、UTC 偏移、选中状态及底部说明完整可见 |
 
-自有 App 探针的具体结果：宿主为 `Asia/Shanghai`，目标与子进程为 `America/New_York`；POSIX 偏移均为 -14400 秒，Foundation 均返回纽约时区；父子进程 Unix 时间戳在宿主前后采样区间内。仅对这个自有样本成立，不能外推所有 Cocoa/Electron 应用。
+以上测试不证明所有 macOS 应用都采用 TZ，也不证明运行中的应用可以热切换时区。
 
-测试还发现并修复了 macOS 14 的时区别名问题：系统列表可能只有 `Asia/Calcutta`，但 Foundation 可以解析 `Asia/Kolkata`；现支持有效 IANA 别名和手工输入，并继续拒绝 `UTC+9` 等非 IANA 固定偏移写法。
+选择器截图仅在验收输出中合成不透明背景，不改变产品原生弹出层。清晰截图证据：`tmp/20260927T020256Z-ui-smoke-Uw01R4/window.png`。release 构建、Info.plist 与本地签名检查均通过。
 
-## 尚未验证
+## 最终真实应用证据
 
-依据用户本轮约束，以下项目保留为待实机验证：
+最终冻结的诊断驱动与核心库完成联合 157/157 检查；该计数以最终联合报告为准，不与此前分开的测试数字相加。证据位于 `tmp/20260927-100138-native-real-apps/REPORT.md` 和 `summary.json`，目录保留供复核，不纳入提交。
 
-- 真实 Chrome 的网页、跨域 iframe、Dedicated/Service Worker 覆盖，以及当前安装版本的协议行为。
-- Shared Worker、扩展、浏览器原生界面；这些也不在一次基础页面检查的承诺范围内。
-- 真实登录资料跨重启保持、系统睡眠唤醒、真实页面阻止关闭、真实浏览器断连恢复。
-- Cherry Studio 或其他第三方应用实际发给模型的日期、时间、时区字段；聊天、Agent、MCP、远程工具需分别检查。
-- 完整 Xcode 环境下的 SwiftPM/XCTest 路径、Intel 和其他 macOS 版本。
+Chrome 的页面、新标签、弹窗、跨域 iframe、Dedicated Worker、Shared Worker 和 Service Worker 在纽约、加尔各答、系统上海三个阶段均正确；真实时间戳、7 个历史日期转换（含夏令时边界）及 Cookie/localStorage 持久化通过。Cherry 主进程、renderer 的真实时刻、IANA 规则与历史转换通过。
 
-相关自有诊断入口和人工流程已提供于 [集成验证说明](INTEGRATION.md)。模拟协议或自有 App 测试通过不等于上述项目通过。
+所有重启、恢复系统时区和退出均由生产 NativeLauncher 完成；6 个自有应用进程、2 个驱动和 fixture 正常退出。个人 Chrome PID 1114 前后仍运行，宿主保持 CST +0800。测试使用隔离资料，不读取或修改个人资料。
+
+最终 Chrome 使用正常窗口，未使用导致早期测试无窗口进程不退出的 `--no-startup-window`。未用 CDP 替代产品退出流程，旧失败测试及单独清理不计入本次通过。
+
+## Cherry Studio 的实际请求结论
+
+统一启动器依次应用纽约、加尔各答并恢复系统上海，实际普通聊天请求的 `{{datetime}}` 与各阶段时区一致。`{{timezone}}` 仍作为未解析文本发送，请求体没有独立 timezone 字段。不能将此表述为“请求时区字段已修复”；TZBox 没有增加或改写请求字段。
+
+此结论仅覆盖被实测的普通聊天路径，不覆盖 Agent、MCP 或远程工具。测试使用合成消息和隔离资料，不代表已验证个人账号、登录会话或真实历史数据。
+
+## 生命周期与状态约定
+
+- 目标时区可以随时修改；已有受管应用继续显示原启动时区，逐行正常重启后才应用新目标。
+- 既有/外部启动实例显示未受管。退出拒绝或超时不会强杀，也不会另起实例假报成功。
+- 恢复系统时区先正常退出，再无 TZ 重启。退出 TZBox 不关闭应用，保存的存活会话可在再次打开后恢复识别。
+- 损坏记录保留备份后重新扫描，无法证明已应用 TZ 的实例保持未受管。
+- 受管记录保存失败时保留内存跟踪并提示；仍有受管应用时阻止直接退出 TZBox。
+
+## 仍未验证
+
+- 未列出的应用版本、扩展、浏览器原生界面、任意应用的所有时间 API。
+- 真实个人登录资料跨重启、睡眠唤醒、真实页面取消关闭。
+- Cherry Agent/MCP/远程工具、跨午夜和夏令时边界的端到端请求。
+- 受管应用行、错误提示及确认弹窗、完整 GUI 操作仍未验收；已有截图覆盖空列表、未受管运行行、停止行与时区选择器。
+- 完整 Xcode 环境下 SwiftPM/XCTest、Intel 和其他 macOS 版本。
+
+复验流程见 [集成验证说明](INTEGRATION.md)。

@@ -1,4 +1,5 @@
 """Package our diagnostic executable as a private NSWorkspace launch fixture."""
+
 import pathlib
 import plistlib
 import shutil
@@ -19,16 +20,23 @@ if library.is_file():
     frameworks = contents / "Frameworks"
     frameworks.mkdir()
     shutil.copy2(library, frameworks / library.name)
-    subprocess.run(["/usr/bin/codesign", "--force", "--sign", "-", str(frameworks / library.name)], check=True)
+    subprocess.run(
+        ["/usr/bin/codesign", "--force", "--sign", "-", str(frameworks / library.name)],
+        check=True,
+    )
 with (contents / "Info.plist").open("wb") as stream:
-    plistlib.dump({
-        "CFBundleExecutable": "TZBoxProbe",
-        "CFBundleIdentifier": "dev.tzbox.probe",
-        "CFBundlePackageType": "APPL",
-        "CFBundleName": "TZBox Probe",
-        "CFBundleVersion": "1",
-        "CFBundleShortVersionString": "0.1.0",
-        "LSBackgroundOnly": True,
-        "TZBoxProbeOutput": str(root / "probe-output.json"),
-    }, stream)
+    plistlib.dump(
+        {
+            "CFBundleExecutable": "TZBoxProbe",
+            "CFBundleIdentifier": "dev.tzbox.probe",
+            "CFBundlePackageType": "APPL",
+            "CFBundleName": "TZBox Probe",
+            "CFBundleVersion": "1",
+            "CFBundleShortVersionString": "0.1.0",
+            "LSBackgroundOnly": True,
+            "TZBoxProbeOutput": str(root / "probe-output.json"),
+            "TZBoxProbeKeepAlive": "--keep-alive" in sys.argv[3:],
+        },
+        stream,
+    )
 subprocess.run(["/usr/bin/codesign", "--force", "--sign", "-", str(bundle)], check=True)

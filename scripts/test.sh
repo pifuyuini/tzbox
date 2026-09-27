@@ -21,6 +21,19 @@ else
 fi
 PYTHONDONTWRITEBYTECODE=1 "$repository/.venv/bin/python" -m unittest discover -s Tests/fixtures -p 'test_*.py'
 if [ "${1:-}" = --native-probe ]; then
-  "$repository/.venv/bin/python" scripts/make_probe_bundle.py "$binary_directory/TZBoxDiagnostics" "$test_root"
-  "$binary_directory/TZBoxDiagnostics" native-probe "$test_root/TZBoxProbe.app" "$test_root/probe-output.json" America/New_York
+  "$repository/.venv/bin/python" scripts/make_probe_bundle.py "$binary_directory/TZBoxDiagnostics" "$test_root" --keep-alive
+  if "$binary_directory/TZBoxDiagnostics" native-lifecycle "$test_root/TZBoxProbe.app" "$test_root/wrong-output.json" >/dev/null 2>&1; then
+    echo "Probe policy failed: mismatched output was accepted" >&2
+    exit 1
+  fi
+  if TZBOX_TEST_ROOT="$test_root/unmarked" "$binary_directory/TZBoxDiagnostics" native-lifecycle "$test_root/TZBoxProbe.app" "$test_root/probe-output.json" >/dev/null 2>&1; then
+    echo "Probe policy failed: an unmarked task root was accepted" >&2
+    exit 1
+  fi
+  if [ -e "$test_root/probe-output.json" ] || [ -e "$test_root/wrong-output.json" ]; then
+    echo "Probe policy failed: a rejected request launched the fixture" >&2
+    exit 1
+  fi
+  echo "Probe boundary checks: 2/2 passed before launch"
+  "$binary_directory/TZBoxDiagnostics" native-lifecycle "$test_root/TZBoxProbe.app" "$test_root/probe-output.json"
 fi

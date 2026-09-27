@@ -1,37 +1,45 @@
 # 集成验证说明
 
-本轮用户指定只运行代码和自有测试，以下真实应用流程尚未执行。它们是后续验收入口，不能当作兼容性结论。
+产品使用统一 NSWorkspace + TZ 生命周期。Chrome 和 Cherry Studio 都通过同一个 NativeLauncher 启动、正常退出和重启；产品不使用 CDP 覆写网页，也不创建专用 Chrome profile。测试为了不接触个人资料，可使用明确授权的隔离参数，它们不是产品默认行为。
 
-## 自有启动探针
+兼容性结论见 [验证记录](VALIDATION.md)。测试须限定应用路径、版本、可关闭进程和测试资料；不得关闭原有个人 Chrome 或其他非测试实例。
 
-`./scripts/test.sh --native-probe` 创建临时 App bundle，用真实 NSWorkspace 启动，检查 TZ 传递、子进程继承、POSIX 时间转换、真实 Unix 时间戳位于宿主采样区间、宿主时区未改变。Foundation 使用的默认时区单独记录，不能据此推断所有第三方 Cocoa 应用。
+## 自有启动与生命周期探针
 
-## 真实 Chrome（需要单独授权）
+`./scripts/test.sh --native-probe` 创建本次专用 App bundle，使用真实 NSWorkspace 验证：
 
-1. 明确选定安装的 Chrome 路径与版本。
-2. 在仓库 `tmp/` 下创建本次专用目录及 `.codex-tmp`，该目录只存放本次测试资料。
-3. 用 `.venv/bin/python Tests/fixtures/server.py --test-root <绝对路径>` 启动本机 fixture。它打印随机端口，同时写出 `fixture-server.json`。
-4. 运行开发诊断程序（不是公开产品 CLI）：
+- 纽约、加尔各答的父子进程 TZ、POSIX/Foundation 时间转换与真实时间戳。
+- 正常退出旧进程后以新时区启动，重建控制器后恢复活跃会话。
+- 恢复系统环境时不残留 TZ，状态变为运行中但未受管。
+- 正常退出后不残留受管状态，宿主时区不变。
 
-```text
-build/swift/debug/TZBoxDiagnostics chrome <Chrome.app绝对路径> <测试目录>/chrome-profile http://127.0.0.1:<端口> America/New_York <测试目录>/chrome-report.json
-```
+它不验证第三方应用的个人资料、页面保存提示或所有时间 API。
 
-用 `./scripts/compile.sh debug` 构建并获取确切二进制目录；Command Line Tools fallback 位于 `build/native/debug`。
+## 真实应用复验
 
-5. 分别验证基础页、新标签、弹窗、跨域 iframe、Dedicated Worker、Service Worker；Shared Worker、扩展与浏览器原生界面仍需额外验证。
-6. 独立验证：重新启动资料保留、断连恢复、睡眠唤醒、正常退出被网页取消、错误应用路径和 Chrome 升级后的行为。这些不能由一次探针结果替代。
-7. 结束时正常关闭测试 Chrome 和本次 fixture 服务。包含浏览器资料的临时目录应检查后按仓库临时文件规则清理；通用自测清理脚本不会擅自删除这些资料。
+1. 明确应用路径、版本和现有个人进程；建立带 `.codex-tmp` 的本次测试目录。
+2. 确认该应用支持隔离测试资料。使用合成资料和消息，不读取个人配置、登录资料或历史对话。
+3. 通过统一 NativeLauncher 依次测试 `America/New_York → Asia/Kolkata → 恢复系统环境`。每次核对旧进程正常退出、新进程身份、启动环境和实际应用行为。
+4. 核对测试资料在正常重启后仍保留；这不等于已经验证个人登录状态或所有应用数据。
+5. 退出时仅关闭本次拥有的实例和 fixture。保留必要证据，按仓库规则清理本次目录。
 
-## Cherry Studio 作为普通应用样本（需要单独授权）
+开发诊断程序不是产品 CLI。用 `./scripts/compile.sh debug` 获取确切二进制目录；本机 Command Line Tools 路径为 `build/native/debug`。旧 `TZBoxDiagnostics chrome ...` 命令已移除。
 
-先核实所安装版本能否可靠使用隔离资料；不能确认时，不修改或复用已有个人配置。本轮没有解包或修改 Cherry Studio。
+开发 `session APP CONTROL_ROOT` 驱动从测试目录读取 `launch-options.json`，接受标准输入 JSON 的 apply、restore、quit、status、exit 操作。测试参数与进程排除列表必须事先按授权范围确定；不要以任意个人 App 直接运行诊断。生产启动默认不设置这些测试参数。
 
-- 启动上述本机 fixture，提供 `/v1/models`、`/v1/chat/completions` 和流式响应。
-- 在明确授权的测试配置中使用本机地址和虚构密钥；只使用合成消息。
-- 在测试系统提示中使用该版本支持的日期时间变量，例如 `{{date}}`、`{{time}}`、`{{datetime}}`。如果该功能原本不附带时区字段，记录“无此字段”，不能假定其存在。
-- 从 TZBox 用与宿主不同的时区启动应用；比较 `fixture-requests.jsonl` 中实际收到的提示内容、存在的时区字段及采样时间。
-- 核对跨午夜、夏令时前后、重启后的同类请求。Agent、MCP 和远程工具单独列范围，不能把普通聊天结果外推。
-- fixture 的回答固定且不代表验证成功。请求日志不保存鉴权头，但会保存合成消息，因此不要接入真实个人聊天。
+## Chrome 检查范围
 
-任何失败项目记录为未兼容；不能仅凭环境变量、程序成功启动或模型口头回答就标记接管成功。
+使用真实 Chrome 154，检查网页 Date/Intl、跨域 iframe、Dedicated Worker、Shared Worker、Service Worker 的结果，并与宿主前后采样的真实时间戳比较。若诊断使用调试协议，它仅用于读取测试证据，不代表产品仍依赖 CDP。
+
+不能用无窗口后台启动模式代替正常 UI 生命周期验收。正常退出、资料保留、时区切换和恢复系统环境都应由统一启动器实际完成。扩展、浏览器原生界面、睡眠唤醒和真实页面阻止关闭需要独立验证。
+
+## Cherry Studio 检查范围
+
+使用真实 Cherry Studio 2.0.8 和本机 HTTP fixture：
+
+- fixture 提供模型列表、聊天与流式响应；使用虚构密钥与合成提示。
+- 从实际请求核对 `{{date}}`、`{{time}}`、`{{datetime}}` 及存在的时区字段，不能用模型回答作为证据。
+- 本轮普通聊天的 `{{datetime}}` 随纽约、加尔各答、系统上海正确变化；`{{timezone}}` 未解析，请求没有独立 timezone 字段。
+- Agent、MCP、远程工具、跨午夜及夏令时边界分别列为未验证，不从普通聊天外推。
+
+fixture 请求日志不保存鉴权头，但保存合成消息；不得接入个人聊天。任何未覆盖行为都应保持未验证。
